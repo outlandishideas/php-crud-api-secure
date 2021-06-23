@@ -10,6 +10,13 @@ class SecureConfig extends Config
     protected $_values;
     protected $_table_column_mapping;
 
+    /**
+     * SecureConfig constructor.
+     * @param array $values Accepts the same keys as  `Tqdev\PhpCrudApi\Config::__construct()`
+     * @param null|array[][] $table_column_mapping either a 2D array like `[tablename] => [col1, col2]` (for read-only)
+     *              or a 3D array containing `[read] => [tablename] => [col1, col2], [write] => [tablename] => [col1]`
+     * @throws \Exception
+     */
     public function __construct(array $values, $table_column_mapping = null)
     {
         $this->_values = $values;
