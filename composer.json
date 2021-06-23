@@ -1,7 +1,7 @@
 {
     "name": "outlandish/php-crud-api",
     "type": "library",
-    "description": "Secure by default wrapper around mevdschee/php-crud-ap.",
+    "description": "Secure by default wrapper around mevdschee/php-crud-api.",
     "require": {
         "mevdschee/php-crud-api": "^2.12"
     },
