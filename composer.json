@@ -6,6 +6,6 @@
         "mevdschee/php-crud-api": "^2.12"
     },
     "autoload": {
-        "psr-4": { "": "src/", "Tqdev\\PhpCrudApi\\": "vendor/mevdschee/php-crud-api/src/Tqdev/PhpCrudApi" }
+        "psr-4": { "": "src/" }
     }
 }
