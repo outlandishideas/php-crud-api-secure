@@ -7,11 +7,26 @@ use Tqdev\PhpCrudApi\Config;
 
 class SecureConfig extends Config
 {
+    protected $_values;
+    protected $_table_column_mapping;
+
     public function __construct(array $values, $table_column_mapping = null)
     {
+        $this->_values = $values;
+        $this->_table_column_mapping = $table_column_mapping;
         // if $table_column_mapping has been supplied we'll automatically enable the `authorization` middleware and
         // provide the `tableHandler` and `columnHandler` middleware functions
         if (is_array($table_column_mapping)) {
+
+            if (!is_array($this->_table_column_mapping) || !is_array(current($this->_table_column_mapping))) {
+                throw new \InvalidArgumentException('`$table_column_mapping` 
+                must be a 2D array in the format [tablename] => [col1, col2]
+                or a 3D array containing [read] => [tablename] => [col1, col2]');
+            }
+            if (!is_array(current(current($this->_table_column_mapping)))) {
+                $this->_table_column_mapping = ['read' => $this->_table_column_mapping, 'write' => []];
+            }
+
             if (!is_array($values)) {
                 $values = [];
             }
@@ -30,20 +45,15 @@ class SecureConfig extends Config
 
             //add a tableHandler based on the $table_column_mapping array (if one is not provided)
             if (!in_array('authorization.tableHandler', array_keys($values))) {
-                $values['authorization.tableHandler'] = function ($operation, $tableName) use ($table_column_mapping) {
-                    return in_array($tableName, array_keys($table_column_mapping));
+                $values['authorization.tableHandler'] = function ($operation, $tableName) {
+                    return $this->isPermitted($operation, $tableName);
                 };
             }
 
             //add a columnHandler based on the $table_column_mapping array (if one is not provided)
             if (!in_array('authorization.columnHandler', array_keys($values))) {
-                $values['authorization.columnHandler'] = function ($operation, $tableName, $columnName) use ($table_column_mapping) {
-                    //if the table is not allowed at all, return false
-                    if (!in_array($tableName, array_keys($table_column_mapping))) {
-                        return false;
-                    }
-                    //if the column is not allowed from the table, return false
-                    return in_array($columnName, $table_column_mapping[$tableName]);
+                $values['authorization.columnHandler'] = function ($operation, $tableName, $columnName) {
+                    return $this->isPermitted($operation, $tableName, $columnName);
                 };
             }
         }
@@ -62,6 +72,26 @@ class SecureConfig extends Config
             throw new \InvalidArgumentException('Config must include authorization.tableHandler middleware. Use `"authorization.columnHandler" => function ($operation, $tableName, $columnName){return true;}` to allow all columns');
         }
 
+    }
+
+    private function isPermitted($operation, $tableName, $columnName = null)
+    {
+        //work out which set of permissions to use
+        if (in_array($operation, ['list', 'read'])) {
+            $permissions = $this->_table_column_mapping["read"];
+        } else {
+            $permissions = $this->_table_column_mapping["write"];
+        }
+
+        if (in_array($tableName, array_keys($permissions))) {
+            if (!$columnName) { //we're just checking if the table is allowed
+                return true;
+            } elseif (in_array($columnName, $permissions[$tableName])) { //the column has been explicitly allowed
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }
