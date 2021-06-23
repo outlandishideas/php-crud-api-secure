@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/php-crud-api-secure.iml" filepath="$PROJECT_DIR$/.idea/php-crud-api-secure.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../tmp-crud/.idea/tmp-crud.iml" filepath="$PROJECT_DIR$/../tmp-crud/.idea/tmp-crud.iml" />
+    </modules>
+  </component>
+</project>
