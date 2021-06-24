@@ -88,6 +88,15 @@ class SecureConfig extends Config
             $permissions = $this->_table_column_mapping["read"];
         } else {
             $permissions = $this->_table_column_mapping["write"];
+
+            // If the request is trying a write operation it should have some sort of  authentication
+            // the authApiKey middleware sets the supplied API-KEY as $_SESSION['API_KEY'] if it is valid
+
+            //todo: make this work with different auth middlewares
+            //todo: return a valid PSR7 response
+            if(!isset($_SESSION) || !isset($_SESSION['API_KEY'])){
+                throw new \Exception("valid X-API-KEY header must be supplied for write operations" );
+            }
         }
 
         if (in_array($tableName, array_keys($permissions))) {
