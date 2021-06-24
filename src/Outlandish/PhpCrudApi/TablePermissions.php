@@ -14,6 +14,8 @@ class TablePermissions
 
 }
 
+/* and then in your app you'd have */
+
 class PetsPermissions extends TablePermissions
 {
     public const READ_COLUMNS = [
@@ -30,6 +32,7 @@ class PetsPermissions extends TablePermissions
         'species',
     ];
 }
+
 class UserPermissions extends TablePermissions
 {
     public const READ_COLUMNS = [

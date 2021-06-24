@@ -2,39 +2,130 @@
 
 namespace Outlandish\PhpCrudApi;
 
-class TablePermissions
+class TablePermissionsAlt
 {
-    const READ_COLUMNS = [];
-    const WRITE_COLUMNS = [];
-    const LIST_COLUMNS = [];
-    const UPDATE_COLUMNS = [];
-    const DELETE_COLUMNS = [];
-    const INCREMENT_COLUMNS = [];
+    protected $read_columns = [];
+    protected $list_columns = [];
+    protected $update_columns = [];
+    protected $delete_columns = [];
+    protected $increment_columns = [];
+
+    /**
+     * @return array
+     */
+    public function getReadColumns(): array
+    {
+        return $this->read_columns;
+    }
+
+
+    /**
+     * @return array
+     */
+    public function getListColumns(): array
+    {
+        return $this->list_columns;
+    }
+
+    /**
+     * @return array
+     */
+    public function getUpdateColumns(): array
+    {
+        return $this->update_columns;
+    }
+
+    /**
+     * @return array
+     */
+    public function getDeleteColumns(): array
+    {
+        return $this->delete_columns;
+    }
+
+    /**
+     * @return array
+     */
+    public function getIncrementColumns(): array
+    {
+        return $this->increment_columns;
+    }
 
 
 }
 
-class PetsPermissions extends TablePermissions
+/* and then in your app you'd have */
+
+
+class PetsPermissions extends TablePermissionsAlt
 {
-    public const READ_COLUMNS = [
+    protected $read_columns = [
+        'id',
+        'owner',
+        'favourite_food',
+        'species',
+    ];
+    protected $write_columns = [
         'id',
         'owner',
         'favourite_food',
         'species',
     ];
 
-    public const WRITE_COLUMNS = [
-        'id',
-        'owner',
-        'favourite_food',
-        'species',
-    ];
+    public function getReadColumns(): array
+    {
+        return $this->read_columns;
+    }
+
+
+    /**
+     * @return array
+     */
+    public function getListColumns(): array
+    {
+        return $this->read_columns;
+    }
+
+    /**
+     * @return array
+     */
+    public function getUpdateColumns(): array
+    {
+        return $this->update_columns;
+    }
+
+    /**
+     * @return array
+     */
+    public function getDeleteColumns(): array
+    {
+        return $this->write_columns;
+    }
+
+    /**
+     * @return array
+     */
+    public function getIncrementColumns(): array
+    {
+        $increment = $this->write_columns;
+        $increment[] = 'favourites';
+        return $increment;
+    }
+
+
+
 }
 class UserPermissions extends TablePermissions
 {
-    public const READ_COLUMNS = [
+    protected $read_columns = [
         'id',
-        'display_name',
+        'owner',
+        'favourite_food',
+        'species',
     ];
+    public function getListColumns(): array
+    {
+        return $this->read_columns;
+    }
 
 }
