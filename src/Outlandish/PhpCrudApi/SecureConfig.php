@@ -14,10 +14,8 @@ class SecureConfig extends Config
     /**
      * SecureConfig constructor.
      * @param array $values Accepts the same keys as  `Tqdev\PhpCrudApi\Config::__construct()`
-     * @param TablePermissions[]|null $table_column_mapping either
-     *              a 2D array like `[tablename] => [col1, col2]` (for read-only)
-     *              an array of TablePermissions classes
-     *              or a 3D array containing `[tablename] => [read] => [col1, col2], [tablename] => [write] => [col1]`
+     * @param string[]|null $table_column_mapping
+     *              an array of classnames of sub-classes of Outlandish\PhpCrudApi\TablePermissions
      * @throws \Exception
      */
     public function __construct(array $values, array $table_column_mapping = null)
@@ -33,7 +31,7 @@ class SecureConfig extends Config
                     $this->_table_column_mapping[$table::getTableName()] = $table::toArray();
                 }
             } else {
-                throw new \InvalidArgumentException('`$table_column_mapping` must be an array of `Outlandish\PhpCrudApi\TablePermissions` class descendents');
+                throw new \InvalidArgumentException('`$table_column_mapping` must be an array of `Outlandish\PhpCrudApi\TablePermissions` sub-classes');
             }
 
             // Make sure $values is properly initialised
