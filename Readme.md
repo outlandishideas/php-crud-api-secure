@@ -48,14 +48,16 @@ return function (App $app) {
 
 ### Using table_column mapping helper
 
-The SecureConfig class can be passed a two dimensional array containing table_names->column_names that can be used to
-automatically configure the column and table handlers:
+The SecureConfig class can be passed an array of TablePermissions sub-classes to make it easier to explicitly
+define which columns from which tables can be operated on:
 
 ```php
 
 use Slim\App;
 use Outlandish\PhpCrudApi\SecureConfig;
 use Tqdev\PhpCrudApi\Api;
+use Outlandish\PhpCrudApi\TablePermissions;
+
 require 'vendor/autoload.php';
 
 return function (App $app) {
@@ -64,22 +66,37 @@ return function (App $app) {
             Response $response,
             array $args
         ) {
-            $allowed_tables_columns = [
-                "users" => [
-                    'id',
-                    'display_name'
-                ],
-                "pets" => [
-                    'id',
-                    'name',
-                    'favourite_food'
-                ]
+            class UsersTablePermissions extends TablePermissions {
+
+                protected const ALL_READ_COLUMNS = ["id", "display_name"];
+        
+                public static function getTableName(): string
+                {
+                    return "users";
+                }
+        
+            }
+            class PetsTablePermissions extends TablePermissions {
+        
+                protected const ALL_READ_COLUMNS = ["id", "name", "favourite_food", "species", "owner"];
+                protected const CREATE_COLUMNS = ["name", "favourite_food", "species", "owner"];
+        
+                public static function getTableName(): string
+                {
+                    return "pets";
+                }
+            }
+        
+            $table_columns_mapping = [
+                PetsTablePermissions::class,
+                UsersTablePermissions::class
             ];
+
             
             $config = new SecureConfig([
                 'middlewares' => 'pageLimits',
                 'pageLimits.records' => 2,
-            ], $allowed_tables_columns);
+            ], $table_columns_mapping);
             
             $api = new Api($config);
             $response = $api->handle($request);
@@ -87,4 +104,62 @@ return function (App $app) {
         }
     );
 };
+```
+
+The `TablePermissions` sub-classes can set their permissions either by defining the following constants as 
+arrays of column names (or boolean for delete) which does not use columns:
+
+* `ALL_READ_COLUMNS` (default for read/list)
+* `ALL_WRITE_COLUMNS` (default for create/update/increment/delete)
+* `READ_COLUMNS` 
+* `LIST_COLUMNS` 
+* `CREATE_COLUMNS` 
+* `UPDATE_COLUMNS` 
+* `INCREMENT_COLUMNS` 
+* `ALLOW_DELETE` (boolean) 
+
+We recommend handling authentication in your outer application rather than using the built in middleware e.g. 
+
+```PHP
+
+class PetsTablePermissions extends TablePermissions {
+        
+    protected const ALL_READ_COLUMNS = ["id", "name", "favourite_food", "species", "owner"];
+    protected const CREATE_COLUMNS = ["name", "favourite_food", "species", "owner"];
+
+    public static function getTableName(): string
+    {
+        return "pets";
+    }
+}
+
+class PetsTablePermissionsAuthenticatedUser extends TablePermissions {
+        
+    protected const ALL_READ_COLUMNS = ["id", "name", "favourite_food", "species", "owner"];
+    protected const CREATE_COLUMNS = ["name", "favourite_food", "species", "owner"];
+
+    public static function getTableName(): string
+    {
+        return "pets";
+    }
+    
+    public static function getUpdateColumns(){
+        return static::getReadColumns();
+    }
+}
+
+if (Auth::check()) {
+    // The user is logged in...
+    $table_columns_mapping = [
+        PetsTablePermissionsAuthenticatedUser::class,
+    ];
+}else{
+    //it's an anonymous user
+    $table_columns_mapping = [
+        PetsTablePermissions::class,
+    ];
+}
+
+
+
 ```

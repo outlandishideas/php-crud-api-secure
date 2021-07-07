@@ -3,50 +3,54 @@
 namespace Outlandish\PhpCrudApi;
 
 use Tqdev\PhpCrudApi\Config;
+use Outlandish\PhpCrudApi\TablePermissions;
 
 
 class SecureConfig extends Config
 {
-    protected $_values;
-    protected $_table_column_mapping;
+    protected $_values = [];
+    protected $_table_column_mapping = [];
 
     /**
      * SecureConfig constructor.
      * @param array $values Accepts the same keys as  `Tqdev\PhpCrudApi\Config::__construct()`
-     * @param null|array[][] $table_column_mapping either a 2D array like `[tablename] => [col1, col2]` (for read-only)
-     *              or a 3D array containing `[read] => [tablename] => [col1, col2], [write] => [tablename] => [col1]`
+     * @param TablePermissions[]|null $table_column_mapping either
+     *              a 2D array like `[tablename] => [col1, col2]` (for read-only)
+     *              an array of TablePermissions classes
+     *              or a 3D array containing `[tablename] => [read] => [col1, col2], [tablename] => [write] => [col1]`
      * @throws \Exception
      */
-    public function __construct(array $values, $table_column_mapping = null)
+    public function __construct(array $values, array $table_column_mapping = null)
     {
         $this->_values = $values;
-        $this->_table_column_mapping = $table_column_mapping;
-        // if $table_column_mapping has been supplied we'll automatically enable the `authorization` middleware and
+        // if $table_column_mapping has been supplied
+        // we'll automatically enable the `authorization` middleware and
         // provide the `tableHandler` and `columnHandler` middleware functions
         if (is_array($table_column_mapping)) {
-
-            if (!is_array($this->_table_column_mapping) || !is_array(current($this->_table_column_mapping))) {
-                throw new \InvalidArgumentException('`$table_column_mapping` 
-                must be a 2D array in the format [tablename] => [col1, col2]
-                or a 3D array containing [read] => [tablename] => [col1, col2]');
+            $firstItem = current($table_column_mapping);
+            if (is_subclass_of($firstItem, TablePermissions::class)) {
+                foreach ($table_column_mapping as $table) {
+                    $this->_table_column_mapping[$table::getTableName()] = $table::toArray();
+                }
+            } else {
+                throw new \InvalidArgumentException('`$table_column_mapping` must be an array of `Outlandish\PhpCrudApi\TablePermissions` class descendents');
             }
-            if (!is_array(current(current($this->_table_column_mapping)))) {
-                $this->_table_column_mapping = ['read' => $this->_table_column_mapping, 'write' => []];
-            }
 
+            // Make sure $values is properly initialised
             if (!is_array($values)) {
                 $values = [];
             }
 
-            //ensure middlewares value is initialised
+            //ensure middlewares key is initialised
             if (!in_array("middlewares", array_keys($values))) {
                 $values['middlewares'] = "";
             }
 
-            //add the authorization middleware if it's not already enabled
+            //add the `authorization` and `pageLimits` middleware if it's not already enabled
             if (!strpos($values['middlewares'], 'authorization')) {
                 $middlewares = explode(",", $values['middlewares']);
                 $middlewares[] = "authorization";
+                $middlewares[] = "pageLimits";
                 $values['middlewares'] = implode(",", $middlewares);
             }
 
@@ -83,30 +87,15 @@ class SecureConfig extends Config
 
     private function isPermitted($operation, $tableName, $columnName = null)
     {
-        //work out which set of permissions to use
-        if (in_array($operation, ['list', 'read'])) {
-            $permissions = $this->_table_column_mapping["read"];
-        } else {
-            $permissions = $this->_table_column_mapping["write"];
+        $permissions = $this->_table_column_mapping[$tableName];
 
-            // If the request is trying a write operation it should have some sort of  authentication
-            // the authApiKey middleware sets the supplied API-KEY as $_SESSION['API_KEY'] if it is valid
-
-            //todo: make this work with different auth middlewares
-            //todo: return a valid PSR7 response
-            if(!isset($_SESSION) || !isset($_SESSION['API_KEY'])){
-                throw new \Exception("valid X-API-KEY header must be supplied for write operations" );
-            }
-        }
-
-        if (in_array($tableName, array_keys($permissions))) {
-            if (!$columnName) { //we're just checking if the table is allowed
+        if (in_array($operation, array_keys($permissions))) {
+            if (!$columnName) { //this is a table-based operation such as delete and we don't care about columns
                 return true;
-            } elseif (in_array($columnName, $permissions[$tableName])) { //the column has been explicitly allowed
+            } elseif (in_array($columnName, $permissions[$operation])) { //the column has been explicitly allowed
                 return true;
             }
         }
-
         return false;
     }
 
