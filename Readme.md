@@ -7,7 +7,7 @@ by ensuring that the `authorization` middleware is enabled and has handlers for 
 
 This library is used in exactly the same way as [mevdschee/php-crud-api](https://github.com/mevdschee/php-crud-api)
 except that it will throw a `InvalidArgumentException` if the `authorization`, `authorization.tableHandler` and
-`authorization.tableHandler` middleware properties are not set in the API contructor.
+`authorization.tableHandler` middleware properties are not set in the API constructor.
 
 ### Using custom `tableHandler` and `columnHandler` functions:
 
@@ -36,6 +36,7 @@ return function (App $app) {
                         if($tableName == 'participants'){
                             return $columnName != 'last_ip_address';
                         }
+                        return false;
                     },
             ]);
             $api = new Api($config);
@@ -46,7 +47,7 @@ return function (App $app) {
 };
 ```
 
-### Using table_column mapping helper
+### Using TablePermissions helper
 
 The SecureConfig class can be passed an array of TablePermissions sub-classes to make it easier to explicitly
 define which columns from which tables can be operated on:
@@ -66,37 +67,36 @@ return function (App $app) {
             Response $response,
             array $args
         ) {
-            class UsersTablePermissions extends TablePermissions {
+            class UsersTablePermissions extends TablePermissions
+            {
+                public function __construct()
+                {
+                    parent::__construct('users');
+                    $this->allReadColumns = ["id", "display_name"];
+                }
+        
+            }
 
-                protected const ALL_READ_COLUMNS = ["id", "display_name"];
-        
-                public static function getTableName(): string
+            class PetsTablePermissions extends TablePermissions
+            {
+                public function __construct()
                 {
-                    return "users";
-                }
-        
-            }
-            class PetsTablePermissions extends TablePermissions {
-        
-                protected const ALL_READ_COLUMNS = ["id", "name", "favourite_food", "species", "owner"];
-                protected const CREATE_COLUMNS = ["name", "favourite_food", "species", "owner"];
-        
-                public static function getTableName(): string
-                {
-                    return "pets";
+                    parent::__construct('pets');
+                    $this->allReadColumns = ["id", "name", "favourite_food", "species", "owner"];
+                    $this->createColumns = ["name", "favourite_food", "species", "owner"];
                 }
             }
         
-            $table_columns_mapping = [
-                PetsTablePermissions::class,
-                UsersTablePermissions::class
+            $tablePermissions = [
+                PetsTablePermissions::getInstance(),
+                UsersTablePermissions::getInstance()
             ];
 
             
             $config = new SecureConfig([
                 'middlewares' => 'pageLimits',
                 'pageLimits.records' => 2,
-            ], $table_columns_mapping);
+            ], $tablePermissions);
             
             $api = new Api($config);
             $response = $api->handle($request);
@@ -106,57 +106,48 @@ return function (App $app) {
 };
 ```
 
-The `TablePermissions` sub-classes can set their permissions either by defining the following constants as 
-arrays of column names (or boolean for delete) which does not use columns:
+The `TablePermissions` sub-classes can set their column permissions with the `xyzColumns` properties below (as 
+arrays of column names), and whether they can be deleted:
 
-* `ALL_READ_COLUMNS` (default for read/list)
-* `ALL_WRITE_COLUMNS` (default for create/update/increment/delete)
-* `READ_COLUMNS` 
-* `LIST_COLUMNS` 
-* `CREATE_COLUMNS` 
-* `UPDATE_COLUMNS` 
-* `INCREMENT_COLUMNS` 
-* `ALLOW_DELETE` (boolean) 
+* `allReadColumns` (default for read/list)
+* `allWriteColumns` (default for create/update/increment/delete)
+* `readColumns` 
+* `listColumns` 
+* `createColumns` 
+* `updateColumns` 
+* `incrementColumns` 
+* `canDelete` (boolean) 
 
-We recommend handling authentication in your outer application rather than using the built in middleware e.g. 
+We recommend handling authentication in your outer application rather than using the built-in middleware e.g. 
 
 ```PHP
 
-class PetsTablePermissions extends TablePermissions {
-        
-    protected const ALL_READ_COLUMNS = ["id", "name", "favourite_food", "species", "owner"];
-    protected const CREATE_COLUMNS = ["name", "favourite_food", "species", "owner"];
-
-    public static function getTableName(): string
+class PetsTablePermissions extends TablePermissions
+{
+    public function __construct()
     {
-        return "pets";
+        parent::__construct('pets');
+        $this->allReadColumns = ["id", "name", "favourite_food", "species", "owner"];
+        $this->createColumns = ["name", "favourite_food", "species", "owner"];
     }
 }
 
-class PetsTablePermissionsAuthenticatedUser extends TablePermissions {
-        
-    protected const ALL_READ_COLUMNS = ["id", "name", "favourite_food", "species", "owner"];
-    protected const CREATE_COLUMNS = ["name", "favourite_food", "species", "owner"];
-
-    public static function getTableName(): string
-    {
-        return "pets";
-    }
-    
-    public static function getUpdateColumns(){
-        return static::getReadColumns();
+class PetsTablePermissionsAuthenticatedUser extends PetsTablePermissions
+{
+    public function getUpdateColumns(){
+        return $this->getReadColumns();
     }
 }
 
 if (Auth::check()) {
     // The user is logged in...
-    $table_columns_mapping = [
-        PetsTablePermissionsAuthenticatedUser::class,
+    $tablePermissions = [
+        PetsTablePermissionsAuthenticatedUser::getInstance(),
     ];
 }else{
     //it's an anonymous user
-    $table_columns_mapping = [
-        PetsTablePermissions::class,
+    $tablePermissions = [
+        PetsTablePermissions::getInstance(),
     ];
 }
 

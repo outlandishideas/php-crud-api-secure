@@ -1,11 +1,13 @@
 {
     "name": "harry/php-crud-api-secure",
     "type": "library",
-    "description": "Secure by default wrapper around mevdschee/php-crud-api.",
+    "description": "Secure-by-default wrapper around mevdschee/php-crud-api.",
     "require": {
         "mevdschee/php-crud-api": "^2.12"
     },
     "autoload": {
-        "psr-4": { "": "src/" }
+        "psr-4": {
+            "": "src/"
+        }
     }
 }
