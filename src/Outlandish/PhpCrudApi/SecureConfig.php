@@ -4,61 +4,55 @@ namespace Outlandish\PhpCrudApi;
 
 use Tqdev\PhpCrudApi\Config;
 
-
 class SecureConfig extends Config
 {
-    protected $_values;
-    protected $_table_column_mapping;
+    /** @var TablePermissions[] */
+    protected $tablePermissions = [];
 
     /**
      * SecureConfig constructor.
      * @param array $values Accepts the same keys as  `Tqdev\PhpCrudApi\Config::__construct()`
-     * @param null|array[][] $table_column_mapping either a 2D array like `[tablename] => [col1, col2]` (for read-only)
-     *              or a 3D array containing `[read] => [tablename] => [col1, col2], [write] => [tablename] => [col1]`
+     * @param TablePermissions[] $tablePermissions
+     *              an array of classnames of sub-classes of Outlandish\PhpCrudApi\TablePermissions
      * @throws \Exception
      */
-    public function __construct(array $values, $table_column_mapping = null)
+    public function __construct(array $values, array $tablePermissions = [])
     {
-        $this->_values = $values;
-        $this->_table_column_mapping = $table_column_mapping;
-        // if $table_column_mapping has been supplied we'll automatically enable the `authorization` middleware and
+        // Make sure $values is properly initialised
+        if (!is_array($values)) {
+            $values = [];
+        }
+
+        //ensure middlewares key is initialised
+        if (!array_key_exists('middlewares', $values)) {
+            $values['middlewares'] = '';
+        }
+
+        // add the `authorization` and `pageLimits` middleware if it's not already enabled
+        $middlewares = explode(',', $values['middlewares']);
+        $middlewares[] = 'authorization';
+        $middlewares[] = 'pageLimits';
+        $values['middlewares'] = implode(',', array_unique($middlewares));
+
+        // if $tablePermissions has been supplied we'll automatically enable the `authorization` middleware and
         // provide the `tableHandler` and `columnHandler` middleware functions
-        if (is_array($table_column_mapping)) {
-
-            if (!is_array($this->_table_column_mapping) || !is_array(current($this->_table_column_mapping))) {
-                throw new \InvalidArgumentException('`$table_column_mapping` 
-                must be a 2D array in the format [tablename] => [col1, col2]
-                or a 3D array containing [read] => [tablename] => [col1, col2]');
-            }
-            if (!is_array(current(current($this->_table_column_mapping)))) {
-                $this->_table_column_mapping = ['read' => $this->_table_column_mapping, 'write' => []];
-            }
-
-            if (!is_array($values)) {
-                $values = [];
-            }
-
-            //ensure middlewares value is initialised
-            if (!in_array("middlewares", array_keys($values))) {
-                $values['middlewares'] = "";
-            }
-
-            //add the authorization middleware if it's not already enabled
-            if (!strpos($values['middlewares'], 'authorization')) {
-                $middlewares = explode(",", $values['middlewares']);
-                $middlewares[] = "authorization";
-                $values['middlewares'] = implode(",", $middlewares);
+        if (is_array($tablePermissions)) {
+            foreach ($tablePermissions as $table) {
+                if (!($table instanceof TablePermissions)) {
+                    throw new \InvalidArgumentException('`$tablePermissions` must be an array of `Outlandish\PhpCrudApi\TablePermissions` singletons');
+                }
+                $this->tablePermissions[$table->getTableName()] = $table;
             }
 
             //add a tableHandler based on the $table_column_mapping array (if one is not provided)
-            if (!in_array('authorization.tableHandler', array_keys($values))) {
+            if (!array_key_exists('authorization.tableHandler', $values)) {
                 $values['authorization.tableHandler'] = function ($operation, $tableName) {
                     return $this->isPermitted($operation, $tableName);
                 };
             }
 
             //add a columnHandler based on the $table_column_mapping array (if one is not provided)
-            if (!in_array('authorization.columnHandler', array_keys($values))) {
+            if (!array_key_exists('authorization.columnHandler', $values)) {
                 $values['authorization.columnHandler'] = function ($operation, $tableName, $columnName) {
                     return $this->isPermitted($operation, $tableName, $columnName);
                 };
@@ -67,38 +61,27 @@ class SecureConfig extends Config
 
         parent::__construct($values);
 
-        if (!in_array("authorization", array_keys($this->getMiddlewares()))) {
-            throw new \InvalidArgumentException("Config must include authorization middleware");
+        $middlewares = $this->getMiddlewares();
+
+        if (!array_key_exists('authorization', $middlewares)) {
+            throw new \InvalidArgumentException('Config must include authorization middleware');
         }
 
-        if (!in_array("tableHandler", array_keys($this->getMiddlewares()['authorization']))) {
+        if (!array_key_exists('tableHandler', $middlewares['authorization'])) {
             throw new \InvalidArgumentException('Config must include authorization.tableHandler middleware. Use `"authorization.tableHandler" => function ($operation, $tableName){return true;}` to allow all tables');
         }
 
-        if (!in_array("columnHandler", array_keys($this->getMiddlewares()['authorization']))) {
+        if (!array_key_exists('columnHandler', $middlewares['authorization'])) {
             throw new \InvalidArgumentException('Config must include authorization.tableHandler middleware. Use `"authorization.columnHandler" => function ($operation, $tableName, $columnName){return true;}` to allow all columns');
         }
-
     }
 
-    private function isPermitted($operation, $tableName, $columnName = null)
+    private function isPermitted($operation, $tableName, $columnName = null): bool
     {
-        //work out which set of permissions to use
-        if (in_array($operation, ['list', 'read'])) {
-            $permissions = $this->_table_column_mapping["read"];
-        } else {
-            $permissions = $this->_table_column_mapping["write"];
+        if (!array_key_exists($tableName, $this->tablePermissions)) {
+            return false;
         }
-
-        if (in_array($tableName, array_keys($permissions))) {
-            if (!$columnName) { //we're just checking if the table is allowed
-                return true;
-            } elseif (in_array($columnName, $permissions[$tableName])) { //the column has been explicitly allowed
-                return true;
-            }
-        }
-
-        return false;
+        return $this->tablePermissions[$tableName]->isPermitted($operation, $columnName);
     }
 
 }
